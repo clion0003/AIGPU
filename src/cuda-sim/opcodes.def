@@ -37,6 +37,17 @@ Tex 6
 Nop 7
 Other 10
 */
+
+//add by jiffy 2017/11/23 for huaweiAI
+OP_DEF(LDC_OP,ldc_impl,"ldc",1,5)
+OP_DEF(STC_OP,stc_impl,"stc",0,5)
+OP_DEF(FILLW_OP,fillw_impl,"fillw",1,1)
+OP_DEF(SHIFTFULL_OP,shiftfull_impl,"shiftfull",1,1)
+OP_DEF(SHIFTCOL_OP,shiftcol_impl,"shiftcol",1,1)
+OP_DEF(SHIFTFULLS_OP,shiftfulls_impl,"shiftfulls",1,1)
+OP_DEF(SHIFTCOLS_OP,shiftcols_impl,"shiftcols",1,1)
+//end
+
 OP_DEF(ABS_OP,abs_impl,"abs",1,1)
 OP_DEF(ADD_OP,add_impl,"add",1,1)
 OP_DEF(ADDP_OP,addp_impl,"addp",1,1)

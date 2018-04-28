@@ -53,6 +53,13 @@ int ptx_error( const char *s );
 %x NOT_OPCODE
 %%
 
+shiftfulls     TC; ptx_lval.int_value = SHIFTFULLS_OP; return OPCODE;
+shiftcols     TC; ptx_lval.int_value = SHIFTCOLS_OP; return OPCODE;
+shiftfull     TC; ptx_lval.int_value = SHIFTFULL_OP; return OPCODE;
+shiftcol     TC; ptx_lval.int_value = SHIFTCOL_OP; return OPCODE;
+fillw     TC; ptx_lval.int_value = FILLW_OP; return OPCODE;
+ldc      TC; ptx_lval.int_value = LDC_OP; return OPCODE;
+stc      TC; ptx_lval.int_value = STC_OP; return OPCODE;
 abs	TC; ptx_lval.int_value = ABS_OP; return OPCODE;
 add	TC; ptx_lval.int_value = ADD_OP; return OPCODE;
 addp	TC; ptx_lval.int_value = ADDP_OP; return OPCODE;

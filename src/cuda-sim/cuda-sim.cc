@@ -49,7 +49,9 @@
 #include "decuda_pred_table/decuda_pred_table.h"
 #include "../stream_manager.h"
 #include "cuda_device_runtime.h"
-
+//add by jiffy 2018/2/6
+int m_src_stride = 0;
+//end
 int gpgpu_ptx_instruction_classification;
 void ** g_inst_classification_stat = NULL;
 void ** g_inst_op_classification_stat= NULL;
@@ -586,37 +588,38 @@ void ptx_instruction::set_bar_type()
 
 void ptx_instruction::set_opcode_and_latency()
 {
-	unsigned int_latency[5];
-	unsigned fp_latency[5];
-	unsigned dp_latency[5];
-	unsigned int_init[5];
-	unsigned fp_init[5];
-	unsigned dp_init[5];
+	unsigned int_latency[6];
+	unsigned fp_latency[6];
+	unsigned dp_latency[6];
+	unsigned int_init[6];
+	unsigned fp_init[6];
+	unsigned dp_init[6];
 	/*
 	 * [0] ADD,SUB
 	 * [1] MAX,Min
 	 * [2] MUL
 	 * [3] MAD
 	 * [4] DIV
+	 * [5] SHIFT
 	 */
-	sscanf(opcode_latency_int, "%u,%u,%u,%u,%u",
+	sscanf(opcode_latency_int, "%u,%u,%u,%u,%u,%u",
 			&int_latency[0],&int_latency[1],&int_latency[2],
-			&int_latency[3],&int_latency[4]);
-	sscanf(opcode_latency_fp, "%u,%u,%u,%u,%u",
+			&int_latency[3], &int_latency[4], &int_latency[5]);
+	sscanf(opcode_latency_fp, "%u,%u,%u,%u,%u,%u",
 			&fp_latency[0],&fp_latency[1],&fp_latency[2],
-			&fp_latency[3],&fp_latency[4]);
-	sscanf(opcode_latency_dp, "%u,%u,%u,%u,%u",
+			&fp_latency[3], &fp_latency[4], &fp_latency[5]);
+	sscanf(opcode_latency_dp, "%u,%u,%u,%u,%u,%u",
 			&dp_latency[0],&dp_latency[1],&dp_latency[2],
-			&dp_latency[3],&dp_latency[4]);
-	sscanf(opcode_initiation_int, "%u,%u,%u,%u,%u",
+			&dp_latency[3], &dp_latency[4], &dp_latency[5]);
+	sscanf(opcode_initiation_int, "%u,%u,%u,%u,%u,%u",
 			&int_init[0],&int_init[1],&int_init[2],
-			&int_init[3],&int_init[4]);
-	sscanf(opcode_initiation_fp, "%u,%u,%u,%u,%u",
+			&int_init[3], &int_init[4], &int_init[5]);
+	sscanf(opcode_initiation_fp, "%u,%u,%u,%u,%u,%u",
 			&fp_init[0],&fp_init[1],&fp_init[2],
-			&fp_init[3],&fp_init[4]);
-	sscanf(opcode_initiation_dp, "%u,%u,%u,%u,%u",
+			&fp_init[3], &fp_init[4], &fp_init[5]);
+	sscanf(opcode_initiation_dp, "%u,%u,%u,%u,%u,%u",
 			&dp_init[0],&dp_init[1],&dp_init[2],
-			&dp_init[3],&dp_init[4]);
+			&dp_init[3], &dp_init[4], &dp_init[5]);
 	sscanf(cdp_latency_str, "%u,%u,%u,%u,%u",
 			&cdp_latency[0],&cdp_latency[1],&cdp_latency[2], 
             &cdp_latency[3],&cdp_latency[4]);
@@ -633,6 +636,9 @@ void ptx_instruction::set_opcode_and_latency()
    op = ALU_OP;
    mem_op= NOT_TEX;
    initiation_interval = latency = 1;
+   //add by jiffy 2017/12/29
+   mopcode = m_opcode;
+   //end
    switch( m_opcode ) {
    case MOV_OP:
        assert( !(has_memory_read() && has_memory_write()) );
@@ -641,7 +647,9 @@ void ptx_instruction::set_opcode_and_latency()
        break;
    case LD_OP: op = LOAD_OP; break;
    case LDU_OP: op = LOAD_OP; break;
+   case LDC_OP: op = LOAD_OP; break;
    case ST_OP: op = STORE_OP; break;
+   case STC_OP: op = STORE_OP; break;
    case BRA_OP: op = BRANCH_OP; break;
    case BREAKADDR_OP: op = BRANCH_OP; break;
    case TEX_OP: op = LOAD_OP; mem_op=TEX; break;
@@ -777,6 +785,30 @@ void ptx_instruction::set_opcode_and_latency()
 		   break;
 	   }
 	   break;
+   case SHIFTFULL_OP: case SHIFTCOL_OP:case SHIFTFULLS_OP: case SHIFTCOLS_OP:
+	   //SHIFT latency
+	   switch (get_type()){
+	   case F32_TYPE:
+		   latency = fp_latency[5];
+		   initiation_interval = fp_init[5];
+		   op = ALU_SFU_OP;
+		   break;
+	   case F64_TYPE:
+	   case FF64_TYPE:
+		   latency = dp_latency[5];
+		   initiation_interval = dp_init[5];
+		   op = ALU_SFU_OP;
+		   break;
+	   case B32_TYPE:
+	   case U32_TYPE:
+	   case S32_TYPE:
+	   default: //Use int settings for default
+		   latency = int_latency[5];
+		   initiation_interval = int_init[5];
+		   op = SFU_OP;
+		   break;
+	   }
+	   break;
    case SQRT_OP: case SIN_OP: case COS_OP: case EX2_OP: case LG2_OP: case RSQRT_OP: case RCP_OP:
 	   //Using double to approximate those
 	  latency = dp_latency[2];
@@ -851,6 +883,7 @@ void ptx_instruction::pre_decode()
    ar1 = 0;
    ar2 = 0;
    space = m_space_spec;
+   printf("opcode: %d space1: %d space2: %d\n", m_opcode, space.get_type(), m_space_spec.get_type());
    memory_op = no_memory_op;
    data_size = 0;
    if ( has_memory_read() || has_memory_write() ) {
@@ -881,9 +914,9 @@ void ptx_instruction::pre_decode()
    case WB_OPTION: cache_op = CACHE_WRITE_BACK; break;
    case WT_OPTION: cache_op = CACHE_WRITE_THROUGH; break;
    default: 
-      if( m_opcode == LD_OP || m_opcode == LDU_OP ) 
+      if( m_opcode == LD_OP || m_opcode == LDU_OP || m_opcode == LDC_OP) 
          cache_op = CACHE_ALL;
-      else if( m_opcode == ST_OP ) 
+      else if( m_opcode == ST_OP || m_opcode == STC_OP) 
          cache_op = CACHE_WRITE_BACK;
       else if( m_opcode == ATOM_OP ) 
          cache_op = CACHE_GLOBAL;
@@ -1247,7 +1280,18 @@ void ptx_thread_info::ptx_exec_inst( warp_inst_t &inst, unsigned lane_id)
    const ptx_instruction *pI = m_func_info->get_instruction(pc);
    set_npc( pc + pI->inst_size() );
    
-
+/*	
+   //add by jiffy 2018/2/6
+   const ptx_instruction *next_pI = m_func_info->get_instruction(pc + pI->inst_size());
+   if (next_pI && next_pI->mopcode == 3) {
+	   const operand_info &dst = next_pI->dst();
+	   const operand_info &src4 = next_pI->src4();
+	   unsigned type = next_pI->get_type();
+	   ptx_reg_t src_stride = get_operand_value(src4, dst, type, this, 1); // get the stide of source
+	   m_src_stride = src_stride.s32;
+   }
+   //end
+*/
    try {
 
    clearRPC();
@@ -1405,10 +1449,10 @@ void ptx_thread_info::ptx_exec_inst( warp_inst_t &inst, unsigned lane_id)
       if (space_type) StatAddSample( g_inst_classification_stat[g_ptx_kernel_count], ( int )space_type);
       StatAddSample( g_inst_op_classification_stat[g_ptx_kernel_count], (int)  pI->get_opcode() );
    }
-   if ( (g_ptx_sim_num_insn % 100000) == 0 ) {
+   if ( (g_ptx_sim_num_insn % 1000000) == 0 ) {
       dim3 ctaid = get_ctaid();
       dim3 tid = get_tid();
-      DPRINTF(LIVENESS, "GPGPU-Sim PTX: %u instructions simulated : ctaid=(%u,%u,%u) tid=(%u,%u,%u)\n",
+      printf("GPGPU-Sim PTX: %u instructions simulated : ctaid=(%u,%u,%u) tid=(%u,%u,%u)\n",
              g_ptx_sim_num_insn, ctaid.x,ctaid.y,ctaid.z,tid.x,tid.y,tid.z );
       fflush(stdout);
    }

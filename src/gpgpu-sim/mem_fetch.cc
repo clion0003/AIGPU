@@ -54,6 +54,8 @@ mem_fetch::mem_fetch( const mem_access_t &access,
    m_wid = wid;
    config->m_address_mapping.addrdec_tlx(access.get_addr(),&m_raw_addr);
    m_partition_addr = config->m_address_mapping.partition_address(access.get_addr());
+   //printf("requestUID: %d; addr: %x part_addr: %x; chip:%d bank:%d row:%d col:%d burst:%d\n", m_request_uid, access.get_addr(), m_partition_addr, m_raw_addr.chip,
+   //										m_raw_addr.bk, m_raw_addr.row, m_raw_addr.col, m_raw_addr.burst);
    m_type = m_access.is_write()?WRITE_REQUEST:READ_REQUEST;
    m_timestamp = gpu_sim_cycle + gpu_tot_sim_cycle;
    m_timestamp2 = 0;
@@ -96,6 +98,7 @@ void mem_fetch::set_status( enum mem_fetch_status status, unsigned long long cyc
 {
     m_status = status;
     m_status_change = cycle;
+	//printf("SM: %d; requestUID: %d; status: %d; cycle: %lld; pc: %x; addr: %x\n", m_sid, m_request_uid, m_status, m_status_change, get_pc(), m_partition_addr);
 }
 
 bool mem_fetch::isatomic() const

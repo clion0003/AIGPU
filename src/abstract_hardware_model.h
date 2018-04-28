@@ -341,7 +341,7 @@ struct core_config {
 };
 
 // bounded stack that implements simt reconvergence using pdom mechanism from MICRO'07 paper
-const unsigned MAX_WARP_SIZE = 32;
+const unsigned MAX_WARP_SIZE = 36; // modified by litianjian to warp 36
 typedef std::bitset<MAX_WARP_SIZE> active_mask_t;
 #define MAX_WARP_SIZE_SIMT_STACK  MAX_WARP_SIZE
 typedef std::bitset<MAX_WARP_SIZE_SIMT_STACK> simt_mask_t;
@@ -383,7 +383,7 @@ protected:
     std::deque<simt_stack_entry> m_stack;
 };
 
-#define GLOBAL_HEAP_START 0xC0000000
+#define GLOBAL_HEAP_START 0x703E20000
    // start allocating from this address (lower values used for allocating globals in .ptx file)
 #define SHARED_MEM_SIZE_MAX (64*1024)
 #define LOCAL_MEM_SIZE_MAX (8*1024)
@@ -766,6 +766,9 @@ public:
         pc=(address_type)-1;
         reconvergence_pc=(address_type)-1;
         op=NO_OP;
+		//add by jiffy 2017/12/29
+		mopcode = -1;
+		//end
         bar_type=NOT_BAR;
         red_type=NOT_RED;
         bar_id=(unsigned)-1;
@@ -797,6 +800,7 @@ public:
     }
     bool is_load() const { return (op == LOAD_OP || memory_op == memory_load); }
     bool is_store() const { return (op == STORE_OP || memory_op == memory_store); }
+	int get_space_type() const { return space.get_type(); }
     unsigned get_num_operands() const {return num_operands;}
     unsigned get_num_regs() const {return num_regs;}
     void set_num_regs(unsigned num) {num_regs=num;}
@@ -807,6 +811,9 @@ public:
     address_type pc;        // program counter address of instruction
     unsigned isize;         // size of instruction in bytes 
     op_type op;             // opcode (uarch visible)
+	//add by jiffy 2017/12/29
+	int mopcode;
+	//end
 
     barrier_type bar_type;
     reduction_type red_type;
@@ -1015,6 +1022,7 @@ public:
     }
 
     void print( FILE *fout ) const;
+	void print_small(FILE *fout) const;
     unsigned get_uid() const { return m_uid; }
 
 
@@ -1108,6 +1116,43 @@ class core_t {
         kernel_info_t * get_kernel_info(){ return m_kernel;}
         class ptx_thread_info ** get_thread_info() { return m_thread; }
         unsigned get_warp_size() const { return m_warp_size; }
+
+        //add by jiffy 2017/11/28 for huaweiAI
+		class ptx_thread_info* get_abs_thread(ptx_thread_info* curThread, unsigned absoffset)
+		{
+			int num_threads = m_warp_count * m_warp_size;
+			int res = num_threads;
+			for (int i = 0; i < num_threads; i++)
+			{
+				if (curThread == m_thread[i])
+				{
+					res = i;
+					break;
+				}
+
+			}
+			if (res == num_threads) assert(0);
+			if (0 <= absoffset < m_warp_size) return m_thread[res - (res % m_warp_size) + absoffset];
+			return NULL;
+		}
+		class ptx_thread_info* get_offset_thread(ptx_thread_info* curThread, unsigned offset)
+		{
+			int num_threads = m_warp_count * m_warp_size;
+			int res = num_threads;
+			for (int i = 0; i < num_threads; i++)
+			{
+				if (curThread == m_thread[i])
+				{
+					res = i;
+					break;
+				}
+
+			}
+			if (res == num_threads) assert(0);
+			if (res % m_warp_size + offset < m_warp_size) return m_thread[res + offset];
+			return NULL; 
+		}
+		//end
         void and_reduction(unsigned ctaid, unsigned barid, bool value) { reduction_storage[ctaid][barid] &= value; }
         void or_reduction(unsigned ctaid, unsigned barid, bool value) { reduction_storage[ctaid][barid] |= value; }
         void popc_reduction(unsigned ctaid, unsigned barid, bool value) { reduction_storage[ctaid][barid] += value;}

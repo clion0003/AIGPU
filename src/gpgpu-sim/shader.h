@@ -174,6 +174,13 @@ public:
        m_ibuffer[slot].m_valid=true;
        m_next=0; 
     }
+	bool ibuffer_spare() const
+	{
+		for (unsigned i = 0; i < IBUFFER_SIZE; i++)
+			if (!m_ibuffer[i].m_valid)
+				return true;
+		return false;
+	}
     bool ibuffer_empty() const
     {
         for( unsigned i=0; i < IBUFFER_SIZE; i++) 
@@ -191,7 +198,10 @@ public:
         }
     }
     const warp_inst_t *ibuffer_next_inst() { return m_ibuffer[m_next].m_inst; }
-    bool ibuffer_next_valid() { return m_ibuffer[m_next].m_valid; }
+	//add by jiffy 2017/12/29 
+	const warp_inst_t *ibuffer_next_next_inst() { return m_ibuffer[(m_next + 1) % IBUFFER_SIZE].m_inst; }
+    //end
+	bool ibuffer_next_valid() { return m_ibuffer[m_next].m_valid; }
     void ibuffer_free()
     {
         m_ibuffer[m_next].m_inst = NULL;
@@ -664,7 +674,7 @@ private:
          else if( m_allocation == WRITE_ALLOC ) { fprintf(fp,"wr: "); m_op.dump(fp); }
          fprintf(fp,"\n");
       }
-      void alloc_read( const op_t &op )  { assert(is_free()); m_allocation=READ_ALLOC; m_op=op; }
+	  void alloc_read(const op_t &op)  {assert(!is_read()); m_allocation = READ_ALLOC; m_op = op; }
       void alloc_write( const op_t &op ) { assert(is_free()); m_allocation=WRITE_ALLOC; m_op=op; }
       void reset() { m_allocation = NO_ALLOC; }
    private:
@@ -744,6 +754,12 @@ private:
       {
           return m_allocated_bank[bank].is_free();
       }
+	  //add by jiffy 2017/12/18 for hwAI
+	  bool bank_idle_for_write(unsigned bank) const
+	  {
+		  return !m_allocated_bank[bank].is_write();
+	  }
+	  //end
       void allocate_bank_for_write( unsigned bank, const op_t &op )
       {
          assert( bank < m_num_banks );

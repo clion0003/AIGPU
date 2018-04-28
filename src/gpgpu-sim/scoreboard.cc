@@ -30,6 +30,10 @@
 #include "../cuda-sim/ptx_sim.h"
 #include "shader_trace.h"
 
+//add by jiffy 2018/2/6
+extern int m_src_stride;
+//end
+
 
 //Constructor
 Scoreboard::Scoreboard( unsigned sid, unsigned n_warps )
@@ -58,6 +62,7 @@ void Scoreboard::printContents() const
 void Scoreboard::reserveRegister(unsigned wid, unsigned regnum) 
 {
 	if( !(reg_table[wid].find(regnum) == reg_table[wid].end()) ){
+		return;
 		printf("Error: trying to reserve an already reserved register (sid=%d, wid=%d, regnum=%d).", m_sid, wid, regnum);
         abort();
 	}
@@ -82,16 +87,17 @@ const bool Scoreboard::islongop (unsigned warp_id,unsigned regnum) {
 
 void Scoreboard::reserveRegisters(const class warp_inst_t* inst) 
 {
-    for( unsigned r=0; r < 4; r++) {
-        if(inst->out[r] > 0) {
-            reserveRegister(inst->warp_id(), inst->out[r]);
-            SHADER_DPRINTF( SCOREBOARD,
-                            "Reserved register - warp:%d, reg: %d\n",
-                            inst->warp_id(),
-                            inst->out[r] );
-        }
-    }
-
+	if (inst->mopcode != 4){
+		for (unsigned r = 0; r < 4; r++) {
+			if (inst->out[r] > 0) {
+				reserveRegister(inst->warp_id(), inst->out[r]);
+				SHADER_DPRINTF(SCOREBOARD,
+					"Reserved register - warp:%d, reg: %d\n",
+					inst->warp_id(),
+					inst->out[r]);
+			}
+		}
+	}
     //Keep track of long operations
     if (inst->is_load() &&
     		(	inst->space.get_type() == global_space ||
@@ -138,10 +144,13 @@ bool Scoreboard::checkCollision( unsigned wid, const class inst_t *inst ) const
 	// Get list of all input and output registers
 	std::set<int> inst_regs;
 
-	if(inst->out[0] > 0) inst_regs.insert(inst->out[0]);
-	if(inst->out[1] > 0) inst_regs.insert(inst->out[1]);
-	if(inst->out[2] > 0) inst_regs.insert(inst->out[2]);
-	if(inst->out[3] > 0) inst_regs.insert(inst->out[3]);
+	//add by jiffy 2018/3/30 ingore ldc dest reg
+	if (inst->mopcode != 0) {
+		if (inst->out[0] > 0) inst_regs.insert(inst->out[0]);
+		if (inst->out[1] > 0) inst_regs.insert(inst->out[1]);
+		if (inst->out[2] > 0) inst_regs.insert(inst->out[2]);
+		if (inst->out[3] > 0) inst_regs.insert(inst->out[3]);
+	}
 	if(inst->in[0] > 0) inst_regs.insert(inst->in[0]);
 	if(inst->in[1] > 0) inst_regs.insert(inst->in[1]);
 	if(inst->in[2] > 0) inst_regs.insert(inst->in[2]);
@@ -149,6 +158,12 @@ bool Scoreboard::checkCollision( unsigned wid, const class inst_t *inst ) const
 	if(inst->pred > 0) inst_regs.insert(inst->pred);
 	if(inst->ar1 > 0) inst_regs.insert(inst->ar1);
 	if(inst->ar2 > 0) inst_regs.insert(inst->ar2);
+
+	if (inst->mopcode == 3) {
+		inst_regs.insert(inst->in[0] + m_src_stride);
+		inst_regs.insert(inst->in[0] + 2 * m_src_stride);
+	}
+
 
 	// Check for collision, get the intersection of reserved registers and instruction registers
 	std::set<int>::const_iterator it2;

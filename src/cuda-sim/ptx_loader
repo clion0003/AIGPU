@@ -315,9 +315,8 @@ void gpgpu_ptxinfo_load_from_string( const char *p_for_info, unsigned source_num
     }
 
     char tempfile_ptxinfo[1024];
-    //snprintf(tempfile_ptxinfo,1024,"%sinfo",fname);
-    snprintf(tempfile_ptxinfo,1024,"_ptx_convinfo");
-	char commandline[1024];
+    snprintf(tempfile_ptxinfo,1024,"%sinfo",fname);
+    char commandline[1024];
     char extra_flags[1024];
     extra_flags[0]=0;
 
@@ -329,7 +328,7 @@ void gpgpu_ptxinfo_load_from_string( const char *p_for_info, unsigned source_num
     else
         snprintf(extra_flags,1024,"--compile-only --gpu-name=sm_%u",sm_version);
 #endif
-/*
+
     snprintf(commandline,1024,"$CUDA_INSTALL_PATH/bin/ptxas %s -v %s --output-file  /dev/null 2> %s",
              extra_flags, fname2, tempfile_ptxinfo);
     printf("GPGPU-Sim PTX: generating ptxinfo using \"%s\"\n", commandline);
@@ -353,11 +352,11 @@ void gpgpu_ptxinfo_load_from_string( const char *p_for_info, unsigned source_num
 		exit(1);
 	}
     }
-*/
+
     ptxinfo_in = fopen(tempfile_ptxinfo,"r");
     g_ptxinfo_filename = tempfile_ptxinfo;
     ptxinfo_parse();
-/*
+
     if( ! g_save_embedded_ptx ) {
         snprintf(commandline,1024,"rm -f %s %s %s", fname, fname2, tempfile_ptxinfo);
         printf("GPGPU-Sim PTX: removing ptxinfo using \"%s\"\n", commandline);
@@ -367,6 +366,5 @@ void gpgpu_ptxinfo_load_from_string( const char *p_for_info, unsigned source_num
     	    exit(1);
         }
     }
-	*/
 }
 

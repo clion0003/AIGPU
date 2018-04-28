@@ -943,6 +943,20 @@ public:
       return m_operands[3];
    }
 
+    //add by jiffy 2017/11/28 for huaweiAI
+   const operand_info &src4() const
+   {
+	   assert(m_operands.size() > 4);
+	   return m_operands[4];
+   }
+
+   const operand_info &src5() const
+   {
+	   assert(m_operands.size() > 5);
+	   return m_operands[5];
+   }
+    //end
+
    const operand_info &operand_lookup( unsigned n ) const
    {
       assert( n < m_operands.size() );
@@ -1010,7 +1024,7 @@ public:
    int membar_level() const { return m_membar_level; }
 
    bool has_memory_read() const {
-      if( m_opcode == LD_OP || m_opcode == LDU_OP || m_opcode == TEX_OP ) 
+      if(m_opcode == LDC_OP || m_opcode == LD_OP || m_opcode == LDU_OP || m_opcode == TEX_OP ) 
          return true;
       // Check PTXPlus operand type below
       // Source operands are memory operands
@@ -1022,7 +1036,7 @@ public:
       return false;
    }
    bool has_memory_write() const {
-      if( m_opcode == ST_OP ) return true;
+      if(m_opcode == STC_OP || m_opcode == ST_OP ) return true;
       // Check PTXPlus operand type below
       // Destination operand is a memory operand
       ptx_instruction::const_iterator op=op_iter_begin();

@@ -47,6 +47,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %token  PTR_DIRECTIVE
 %token  ENTRY_DIRECTIVE
 %token  EXTERN_DIRECTIVE
+%token  WEAK_DIRECTIVE
 %token  FILE_DIRECTIVE
 %token  FUNC_DIRECTIVE
 %token  GLOBAL_DIRECTIVE
@@ -512,8 +513,7 @@ compare_spec:EQ_OPTION { add_option(EQ_OPTION); }
 	| NAN_OPTION { add_option(NAN_OPTION); } 
 	;
 
-operand_list: /* empty*/
-    | operand
+operand_list: operand
 	| operand COMMA operand_list;
 
 operand: IDENTIFIER  { add_scalar_operand( $1 ); }

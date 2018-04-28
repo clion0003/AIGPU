@@ -293,6 +293,25 @@ public:
    ptx_reg_t get_operand_value( const operand_info &op, operand_info dstInfo, unsigned opType, ptx_thread_info *thread, int derefFlag );
    void set_operand_value( const operand_info &dst, const ptx_reg_t &data, unsigned type, ptx_thread_info *thread, const ptx_instruction *pI );
    void set_operand_value( const operand_info &dst, const ptx_reg_t &data, unsigned type, ptx_thread_info *thread, const ptx_instruction *pI, int overflow, int carry );
+   
+   // addby Tianjian Li for Huawei AI , get values in another thread
+   ptx_reg_t get_other_operand_value(const operand_info &op, operand_info dstInfo, unsigned opType, ptx_thread_info *thread, int derefFlag);
+   void set_other_operand_value(const operand_info &dst, const ptx_reg_t &data, unsigned type, ptx_thread_info *thread, const ptx_instruction *pI, ptx_thread_info *dstThread);
+   
+   void set_other_reg(const symbol *reg, const ptx_reg_t &value, ptx_thread_info *dstThread);
+   void set_other_reg_withname(const ptx_reg_t &value, ptx_thread_info *dstThread, std::string reg_name);
+	   // add by Tianjian Li 2017-11-30 to get symbol_table
+   //symbol_table* get_symbol_table(){
+			//return m_symbol_table;
+		//}
+   //ptx_reg_t get_other_reg(const symbol *reg, const ptx_reg_t &value, ptx_thread_info *dstThread);
+   //add by Tianjian Li 2017-11-30 to get_other_reg
+   ptx_reg_t get_other_reg(ptx_thread_info* dstThread, const symbol * dst);
+   ptx_reg_t get_other_reg_withname(ptx_thread_info *dstThread, const symbol *reg, std::string reg_name);
+   
+   //end 
+   
+   
    void get_vector_operand_values( const operand_info &op, ptx_reg_t* ptx_regs, unsigned num_elements );
    void set_vector_operand_values( const operand_info &dst, 
                                    const ptx_reg_t &data1, 
@@ -481,11 +500,52 @@ private:
 
    typedef tr1_hash_map<const symbol*,ptx_reg_t> reg_map_t;
    std::list<reg_map_t> m_regs;
+
+//add by szr
+   ptx_reg_t PE_weight;
+// add by litianjian
+   ptx_reg_t PE_weight_backup;
+   ptx_reg_t PE_input;
+
    std::list<reg_map_t> m_debug_trace_regs_modified;
    std::list<reg_map_t> m_debug_trace_regs_read;
    bool m_enable_debug_trace;
 
    std::stack<class operand_info, std::vector<operand_info> > m_breakaddrs;
+   
+   //add by Tianjian Li 2017-11-30 to get_m_regs
+
+   std::list<reg_map_t> get_m_regs(){
+	   return m_regs;
+   }
+
+   symbol_table* get_symbol_table(){
+	   return m_symbol_table;
+   }
+
+public:
+   void set_PE_weight(ptx_reg_t weight){
+       PE_weight=weight;
+   }
+   // add by litianjian 20181017 implement weight shift
+   void set_PE_weight_backup(ptx_reg_t weight){
+       PE_weight_backup = weight;
+   }
+   ptx_reg_t get_PE_weight_backup(){
+       return PE_weight_backup;
+   }
+   // end 
+   ptx_reg_t get_PE_weight(){
+       return PE_weight;
+   }
+
+   void set_PE_input(ptx_reg_t input){
+	   PE_input = input;
+   }
+   ptx_reg_t get_PE_input(){
+	   return PE_input;
+   }
+   //end
 };
 
 addr_t generic_to_local( unsigned smid, unsigned hwtid, addr_t addr );
