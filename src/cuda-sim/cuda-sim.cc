@@ -785,7 +785,7 @@ void ptx_instruction::set_opcode_and_latency()
 		   break;
 	   }
 	   break;
-   case SHIFTFULL_OP: case SHIFTCOL_OP:case SHIFTFULLS_OP: case SHIFTCOLS_OP:
+   case SHIFTFULL_OP: case SHIFTCOL_OP:case SHIFTFULLS_OP: case SHIFTCOLS_OP:case SHIFTALL_OP:
 	   //SHIFT latency
 	   switch (get_type()){
 	   case F32_TYPE:

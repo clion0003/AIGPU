@@ -3168,23 +3168,186 @@ ptx_reg_t add_cnn(const ptx_instruction *pI, ptx_thread_info *thread, ptx_reg_t 
 	//thread->set_operand_value(dst, data, i_type, thread, pI, overflow, carry);
 }
 
-void shiftfulls_impl(const ptx_instruction *pI, ptx_thread_info *thread) 
+
+//add by jiffy 2018/5/26 for dnn acceleration
+// shift %dst, offset, %src, offset
+void shiftall_impl(const ptx_instruction *pI, ptx_thread_info *thread)
 {
-	inst_not_implemented(pI);
+	const operand_info &dst = pI->dst();
+
+	const operand_info &src1 = pI->src1(); //dest reg offset
+	const operand_info &src2 = pI->src2(); //src reg
+	const operand_info &src3 = pI->src3(); // src reg offset 
+	unsigned type = pI->get_type();
+
+	ptx_reg_t dst_offset = thread->get_operand_value(src1, dst, type, thread, 1); // get the offset of destination
+	ptx_reg_t src_offset = thread->get_operand_value(src3, dst, type, thread, 1); // get the offset of source
+
+	// configuration parameter get by configure file
+	unsigned int ker_size = 6;
+
+	//get other_source thread and other_dst thread
+	core_t *m_core = thread->get_core();
+	unsigned int warp_size = m_core->get_warp_size();
+
+	unsigned int tid = thread->get_hw_tid(); // id of the thread
+	if (tid >= warp_size)
+		return;
+
+	unsigned int to_offset = src_offset.s64 + tid % (ker_size*ker_size);
+	unsigned int real_offset = (to_offset) % warp_size; // 
+
+	// get_real_symbol
+	unsigned new_stride = to_offset / warp_size;
+	const std::string reg_name = src2.name();
+	std::string new_name = generate_name(reg_name, new_stride);
+
+	// get absolute other thread, four arrays are used the same inputs. 
+	ptx_thread_info *other_src_abs_thread = m_core->get_abs_thread(thread, real_offset);
+	ptx_reg_t value = thread->get_other_reg_withname(other_src_abs_thread, src2.get_symbol(), new_name);
+	thread->set_PE_input(value);
+	ptx_reg_t weight = thread->get_PE_weight();
+	//partial sum of one thread
+	ptx_reg_t partial_sum = cnn_mul(pI, value, weight);
+
+	// for dstination register
+	unsigned real_dst_offset = dst_offset.s64 % warp_size;
+	const std::string dst_name = dst.name();
+	ptx_thread_info *other_dst_abs_thread = m_core->get_abs_thread(thread, real_dst_offset);
+
+	ptx_reg_t dst_pre_value = thread->get_other_reg_withname(other_dst_abs_thread, dst.get_symbol(), dst_name); // previous value stored in dest reg
+	partial_sum = add_cnn(pI, thread, dst_pre_value, partial_sum);
+	thread->set_other_reg_withname(partial_sum, other_dst_abs_thread, dst_name);
 }
 
+
+//add by jiffy 2018/4/26 for kernel slice
+// shift %dst, offset, %src, offset, stride
+void shiftfulls_impl(const ptx_instruction *pI, ptx_thread_info *thread) 
+{
+	const operand_info &dst = pI->dst();
+
+	const operand_info &src1 = pI->src1(); //dest reg offset
+	const operand_info &src2 = pI->src2(); //src reg
+	const operand_info &src3 = pI->src3(); // src reg offset 
+	const operand_info &src4 = pI->src4(); // src reg stride
+	unsigned type = pI->get_type();
+
+	ptx_reg_t dst_offset = thread->get_operand_value(src1, dst, type, thread, 1); // get the offset of destination
+	ptx_reg_t src_offset = thread->get_operand_value(src3, dst, type, thread, 1); // get the offset of source
+	ptx_reg_t src_stride = thread->get_operand_value(src4, dst, type, thread, 1); // get the stide of source
+
+	// configuration parameter get by configure file
+	unsigned int ker_size = 6;
+
+	//get other_source thread and other_dst thread
+	core_t *m_core = thread->get_core();
+	unsigned int warp_size = m_core->get_warp_size();
+
+	unsigned int tid = thread->get_hw_tid(); // id of the thread
+	if (tid >= warp_size)
+		return;
+
+	unsigned int to_offset = src_offset.s64 + tid % (ker_size*ker_size);
+	unsigned int real_offset = (to_offset) % warp_size; // 
+	unsigned int to_stride = (tid % (ker_size*ker_size)) / ker_size;
+
+	// get_real_symbol
+	unsigned new_stride = to_stride * src_stride.s64 + to_offset / warp_size;
+	const std::string reg_name = src2.name();
+	std::string new_name = generate_name(reg_name, new_stride);
+
+	// get absolute other thread, four arrays are used the same inputs. 
+	ptx_thread_info *other_src_abs_thread = m_core->get_abs_thread(thread, real_offset);
+	ptx_reg_t value = thread->get_other_reg_withname(other_src_abs_thread, src2.get_symbol(), new_name);
+	thread->set_PE_input(value);
+	ptx_reg_t weight = thread->get_PE_weight();
+	//partial sum of one thread
+	ptx_reg_t partial_sum = cnn_mul(pI, value, weight);
+
+	// for dstination register
+	unsigned real_dst_offset = dst_offset.s64 % warp_size;
+	const std::string dst_name = dst.name();
+	ptx_thread_info *other_dst_abs_thread = m_core->get_abs_thread(thread, real_dst_offset);
+
+	ptx_reg_t dst_pre_value = thread->get_other_reg_withname(other_dst_abs_thread, dst.get_symbol(), dst_name); // previous value stored in dest reg
+	partial_sum = add_cnn(pI, thread, dst_pre_value, partial_sum);
+	thread->set_other_reg_withname(partial_sum, other_dst_abs_thread, dst_name);
+}
 
 void shiftcols_impl(const ptx_instruction *pI, ptx_thread_info *thread)
 {
+	const operand_info &dst = pI->dst();
 
-	inst_not_implemented(pI);
+	const operand_info &src1 = pI->src1(); //dest reg offset
+	const operand_info &src2 = pI->src2(); //src reg
+	const operand_info &src3 = pI->src3(); // src reg offset 
+	const operand_info &src4 = pI->src4(); // src reg stride
+	unsigned type = pI->get_type();
+
+	ptx_reg_t dst_offset = thread->get_operand_value(src1, dst, type, thread, 1); // get the offset of destination
+	ptx_reg_t src_offset = thread->get_operand_value(src3, dst, type, thread, 1); // get the offset of source
+	ptx_reg_t src_stride = thread->get_operand_value(src4, dst, type, thread, 1); // get the stide of source
+
+	// configuration parameter get by configure file
+	unsigned int ker_size = 6;
+	unsigned int pe_block_size = ker_size*ker_size; //
+	//get other_source thread and other_dst thread
+	core_t *m_core = thread->get_core();
+	unsigned int warp_size = m_core->get_warp_size();
+	unsigned int tid = thread->get_hw_tid(); // id of the thread
+	if (tid >= warp_size)
+		return;
+
+	unsigned int real_tid = tid % ker_size;
+	unsigned int tid_threshold = ker_size - 1;
+	unsigned int shift_step = 1;
+
+	ptx_reg_t input_value;
+	ptx_reg_t partial_sum;
+	ptx_thread_info *other_src_thread;
+	ptx_thread_info *other_src_abs_thread;
+
+	if (real_tid < tid_threshold){   //get value from other right PE
+		other_src_thread = m_core->get_offset_thread(thread, shift_step);
+
+		input_value = other_src_thread->get_PE_input();
+		thread->set_PE_input(input_value);
+		partial_sum = cnn_mul(pI, input_value, thread->get_PE_weight());
+	}
+	else{
+		unsigned int tid_in_block = tid % (pe_block_size);
+		unsigned int to_offset = src_offset.s64 + (tid_in_block / ker_size) * ker_size;
+		unsigned int real_offset = to_offset % warp_size; // 
+
+		unsigned int to_stride = tid_in_block / ker_size; //% (ker_size*(ker_size - 1));
+
+		unsigned new_stride = to_stride * src_stride.s64 + to_offset / warp_size; //real stride
+
+		const std::string reg_name = src2.name();
+
+		std::string new_name = generate_name(reg_name, new_stride);
+		// get absolute other thread, four arrays are used the same inputs. 
+		other_src_abs_thread = m_core->get_abs_thread(thread, real_offset);
+
+		input_value = thread->get_other_reg_withname(other_src_abs_thread, src2.get_symbol(), new_name);
+		thread->set_PE_input(input_value);
+		ptx_reg_t weight = thread->get_PE_weight();
+
+		partial_sum = cnn_mul(pI, input_value, weight);
+	}
+
+	// for dstination register
+	unsigned real_dst_offset = dst_offset.s64 % warp_size;
+	const std::string dst_name = dst.name();
+	ptx_thread_info *other_dst_abs_thread = m_core->get_abs_thread(thread, real_dst_offset);
+
+	ptx_reg_t dst_pre_value = thread->get_other_reg_withname(other_dst_abs_thread, dst.get_symbol(), dst_name); // previous value stored in dest reg
+	partial_sum = add_cnn(pI, thread, dst_pre_value, partial_sum);
+	thread->set_other_reg_withname(partial_sum, other_dst_abs_thread, dst_name);
 
 }
-
-
-
-
-
+//end
 
 
 // shift %dst, offset, %src, offset, stride

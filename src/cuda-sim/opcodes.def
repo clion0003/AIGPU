@@ -46,6 +46,7 @@ OP_DEF(SHIFTFULL_OP,shiftfull_impl,"shiftfull",1,1)
 OP_DEF(SHIFTCOL_OP,shiftcol_impl,"shiftcol",1,1)
 OP_DEF(SHIFTFULLS_OP,shiftfulls_impl,"shiftfulls",1,1)
 OP_DEF(SHIFTCOLS_OP,shiftcols_impl,"shiftcols",1,1)
+OP_DEF(SHIFTALL_OP,shiftall_impl,"shiftall",1,1)
 //end
 
 OP_DEF(ABS_OP,abs_impl,"abs",1,1)
